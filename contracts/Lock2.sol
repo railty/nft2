@@ -6,17 +6,18 @@ import "hardhat/console.sol";
 
 contract Lock2 {
     string public host;
+    address payable public owner;
 
     constructor() payable {
-        console.log("constructor of Lock2");
         host = "_";
+        owner = payable(msg.sender);
     }
 
     function setHost(string memory _host) public {
-        console.log("length of ", _host, " is ", bytes(_host).length);
         require(bytes(_host).length > 1, "host length greater than 1");
         //require(msg.sender == owner, "You aren't the owner");
 
         host = _host;
+        owner = payable(msg.sender);
     }
 }
