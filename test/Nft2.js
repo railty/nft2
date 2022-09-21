@@ -22,17 +22,16 @@ describe("Nft2", function () {
     it("Should work", async function () {
       const { nft2, owner, alice, bob} = await loadFixture(deployFixture);
 
-      const days = 100;
+
+      const days = 10;
       await expect(nft2.connect(alice).mintNFT('abc', days, {
         //from: alice.address,
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
 
-
-      const nftId = await nft2.hosts('abc');
-      const nftURI = await nft2.uri(nftId);
+      const rec = await nft2.hosts('abc');
+      const nftURI = await nft2.uri(rec.tokenId);
       console.log(nftURI);
-
     });
   });
 });

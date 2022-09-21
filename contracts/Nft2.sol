@@ -9,7 +9,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 struct Rec { 
-    address payable owner;
+    uint256 tokenId;
+    address owner;
     uint expiredAt;
 }
 
@@ -20,49 +21,49 @@ contract Nft2 is ERC1155, Ownable {
     
     uint rate;
     //mapping(string => Rec) public hosts; 
-    mapping(string => uint256) public hosts; 
+    mapping(string => Rec) public hosts; 
 
     constructor(uint _rate, string memory _baseURI) ERC1155(_baseURI) {
         rate = _rate;
     }
 
+    function _mintNFT() internal returns (uint256){
+        _tokenIds.increment();
+        uint256 newItemId = _tokenIds.current();
+        _mint(msg.sender, newItemId, 1, "");
+        return newItemId;
+    }
+
     function mintNFT(string memory host, uint numOfDays) public payable returns (uint256) {
-        require(msg.value >= numOfDays*rate, "insufficient funds");
-
-
-/*
-        require(bytes(_host).length > 1, "host length must be greater than 1");
+        require(bytes(host).length > 1, "host length must be greater than 1");        
         //console.log(msg.value, numOfDays*rate);
         require(msg.value >= numOfDays*rate, "insufficient funds");
 
-        if (hosts[_host].expiredAt > 0){    //exist record
+        uint256 newItemId = 0;
+        if (hosts[host].expiredAt > 0){    //exist record
             console.log("existing record");
 
-            if (block.timestamp > hosts[_host].expiredAt){
-                hosts[_host] = Rec(_host, payable(msg.sender), block.timestamp + numOfDays*24*60*60);
+            if (block.timestamp > hosts[host].expiredAt){
+                //expired 
+                _burn(hosts[host].owner, hosts[host].tokenId, 1);
+                newItemId = _mintNFT();
+                hosts[host] = Rec(newItemId, msg.sender, block.timestamp + numOfDays*24*60*60);
             }
             else{
-                require(msg.sender == hosts[_host].owner, "You aren't the owner and record is not expired yet");
-                hosts[_host].expiredAt = hosts[_host].expiredAt + numOfDays*24*60*60;
+                require(msg.sender == hosts[host].owner, "You aren't the owner and record is not expired yet");
+
+                _burn(hosts[host].owner, hosts[host].tokenId, 1);
+                newItemId = _mintNFT();
+                hosts[host] = Rec(newItemId, msg.sender, hosts[host].expiredAt + numOfDays*24*60*60);
             }
         }
         else{
             console.log("new record");
-            hosts[_host] = Rec(_host, payable(msg.sender), block.timestamp + numOfDays*24*60*60);
+
+            newItemId = _mintNFT();
+            hosts[host] = Rec(newItemId, msg.sender, block.timestamp + numOfDays*24*60*60);
         }
 
-
- */
-
-
-
-
-
-        _tokenIds.increment();
-        uint256 newItemId = _tokenIds.current();
-        _mint(msg.sender, newItemId, 1, "");
-
-        hosts[host] = newItemId;
         return newItemId;
     }
 
