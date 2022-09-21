@@ -3,7 +3,7 @@ pragma solidity ^0.8.9;
 
 import "hardhat/console.sol";
 
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -14,23 +14,26 @@ struct Rec {
     uint expiredAt;
 }
 
-contract Nft2 is ERC1155, Ownable {
+contract Nft3 is ERC721, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
     mapping(uint256 => string) private _tokenURIs;
     
     uint rate;
-    //mapping(string => Rec) public hosts; 
+    //hostname to record; 
     mapping(string => Rec) public hosts; 
 
-    constructor(uint _rate, string memory _baseURI) ERC1155(_baseURI) {
+    //token id to hostname
+    mapping(uint => string) public ids; 
+
+    constructor(uint _rate) ERC721("NFT3", "NFT3") {
         rate = _rate;
     }
 
     function _mintNFT() internal returns (uint256){
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
-        _mint(msg.sender, newItemId, 1, "");
+        _mint(msg.sender, newItemId);
         return newItemId;
     }
 
@@ -45,14 +48,14 @@ contract Nft2 is ERC1155, Ownable {
 
             if (block.timestamp > hosts[host].expiredAt){
                 //expired 
-                _burn(hosts[host].owner, hosts[host].tokenId, 1);
+                _burn(hosts[host].tokenId);
                 newItemId = _mintNFT();
                 hosts[host] = Rec(newItemId, msg.sender, block.timestamp + numOfDays*24*60*60);
             }
             else{
                 require(msg.sender == hosts[host].owner, "You aren't the owner and record is not expired yet");
 
-                _burn(hosts[host].owner, hosts[host].tokenId, 1);
+                _burn(hosts[host].tokenId);
                 newItemId = _mintNFT();
                 hosts[host] = Rec(newItemId, msg.sender, hosts[host].expiredAt + numOfDays*24*60*60);
             }
@@ -65,10 +68,5 @@ contract Nft2 is ERC1155, Ownable {
         }
 
         return newItemId;
-    }
-
-    function uri(uint256 id) public view override returns (string memory) {
-        //return string(bytes.concat(bytes(super.uri(id)), "/", bytes(Strings.toString(id)), ".json"));
-        return string(abi.encodePacked(super.uri(id), Strings.toString(id), ".json" ));
     }
 }

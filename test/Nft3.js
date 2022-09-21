@@ -12,26 +12,24 @@ describe("Nft2", function () {
   async function deployFixture() {
     const [owner, alice, bob] = await ethers.getSigners();
 
-    const Nft2 = await ethers.getContractFactory("Nft2");
+    const Nft3 = await ethers.getContractFactory("Nft3");
     //const nft2 = await Nft2.deploy(RATE, "https://localhost:3000/{id}.json");
-    const nft2 = await Nft2.deploy(RATE, "https://localhost:3000/");
-    return { nft2, owner, alice, bob };
+    const nft3 = await Nft3.deploy(RATE);
+    return { nft3, owner, alice, bob };
   }
 
   describe("Deployment", function () {
     it("Should work", async function () {
-      const { nft2, owner, alice, bob} = await loadFixture(deployFixture);
+      const { nft3, owner, alice, bob} = await loadFixture(deployFixture);
 
-
-      const days = 10;
-      await expect(nft2.connect(alice).mintNFT('abc', days, {
-        //from: alice.address,
+      const days = 100;
+      await expect(nft3.connect(alice).mintNFT('alice-host', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
 
-      const rec = await nft2.hosts('abc');
-      const nftURI = await nft2.uri(rec.tokenId);
-      console.log(nftURI);
+      expect((await nft3.ownerOf(1))).to.equal(alice.address);
+
+      await expect(nft3.ownerOf(2)).to.be.revertedWith("ERC721: invalid token ID");
     });
   });
 });
