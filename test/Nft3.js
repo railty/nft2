@@ -21,15 +21,64 @@ describe("Nft2", function () {
   describe("Deployment", function () {
     it("Should work", async function () {
       const { nft3, owner, alice, bob} = await loadFixture(deployFixture);
-
       const days = 100;
+
+      //cannot register 1 letter
+      await expect(nft3.connect(bob).mintNFT('a', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).to.be.revertedWith("host length must be greater than 1");
+
+      //alice can register
       await expect(nft3.connect(alice).mintNFT('alice-host', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
-
       expect((await nft3.ownerOf(1))).to.equal(alice.address);
-
       await expect(nft3.ownerOf(2)).to.be.revertedWith("ERC721: invalid token ID");
+
+      //bob cannot register same host
+      await expect(nft3.connect(bob).mintNFT('alice-host', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).to.be.revertedWith("You aren't the owner and record is not expired yet");
+
+      //bob can register diffrent host
+      await expect(nft3.connect(bob).mintNFT('bob-host', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+
+      //100-10 = 90 days later
+      const unlockTime1 = (await time.latest()) + (days-10)*60*60*24;
+      await time.increaseTo(unlockTime1);
+
+      //bob still cannot register
+      await expect(nft3.connect(bob).mintNFT('alice-host', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).to.be.revertedWith("You aren't the owner and record is not expired yet");
+
+      //alice can register/renew
+      const tm1 = (await nft3.hosts('alice-host')).expiredAt;
+      await expect(nft3.connect(alice).mintNFT('alice-host', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+      const tm2 = (await nft3.hosts('alice-host')).expiredAt;
+      expect((tm2-tm1)/60/60/24).to.equal(days);
+
+      //100-10+20 = 110 days later
+      const unlockTime2 = (await time.latest()) + (days+20)*60*60*24;
+      await time.increaseTo(unlockTime2);
+
+      //bob can not register as it is expired
+      const rec1 = await nft3.hosts('alice-host');
+      expect(rec1.owner).to.equal(alice.address);
+      await expect(nft3.connect(bob).mintNFT('alice-host', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+      const rec2 = await nft3.hosts('alice-host');
+
+      expect(rec1.tokenId).not.to.equal(rec2.tokenId);
+      expect(rec2.owner).to.equal(bob.address);
+
+      const tm = rec2.expiredAt - rec1.expiredAt;
+      expect(Math.floor(tm/60/60/24)).to.equal(days+10);
     });
   });
 });
