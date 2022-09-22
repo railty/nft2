@@ -82,54 +82,22 @@ contract Nft3 is ERC721Enumerable, Ownable {
         return _tokenIds.current();    
     }
 
-    function verify(bytes32 smsg, bytes memory sig) public view returns (address) {
-        
-        address x = smsg.recover(sig);
-        console.log("x=", x);
-        return x;
-    }
-
-
-    function messageHash(bytes memory message) public pure returns(bytes32) {
-        return keccak256(message);
-    }
-
-    function ethSignedHash(bytes32 hMessage) public pure returns(bytes32) {
-        return hMessage.toEthSignedMessageHash();
-    }
-
-    function recover(bytes32 hash, bytes memory signature) public pure returns(address) {
-        return hash.recover(signature);
-    }
-
-    function bytes32ToBytes(bytes32 _bytes32) internal pure returns (bytes memory){
-        bytes memory bytesArray = new bytes(32);
-        for (uint256 i; i < 32; i++) {
-            bytesArray[i] = _bytes32[i];
-        }
-        return bytesArray;
-    }
-
     function nonce() public view returns(bytes32) {
         return keccak256(abi.encodePacked(block.number));
     }
 
     //the problem is nonce, which created from solidity and return to js, the next call need use this nonce, 
     //which means we need save the nonce somewhere on chain, which is too expensive
-    function verify(bytes memory signature) public view returns (address) {
+    function verifySignature(bytes memory signature) public view returns (address) {
         bytes32 msgHash = keccak256(
-            abi.encode(nonce(), msg.sender, 1234, "hello world")
+            //abi.encode(nonce(), msg.sender, 1234, "hello world")
+            abi.encode(msg.sender, 1234, "hello world")
         );
         
-        console.log("msgHash=", string(bytes32ToBytes(msgHash)));
-
         bytes32 signedMsgHash = msgHash.toEthSignedMessageHash();
         
-        console.log("msgHash=", string(bytes32ToBytes(signedMsgHash)));
-
         address addr = signedMsgHash.recover(signature);
-
-        
+       
         return addr;
     }
 }

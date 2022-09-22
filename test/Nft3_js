@@ -130,66 +130,30 @@ describe("Nft3", function () {
         const tokenId = await nft3.tokenOfOwnerByIndex(bob.address, i);
         console.log("Bob token = ", tokenId);
       }
+    });
 
-/*
-      const msg = "1234abcd";
-      const hmsg = ethers.utils.hashMessage(msg);
+    it("sign message should work", async function () {
+      const { nft3, owner, alice, bob} = await loadFixture(deployFixture);
 
-      let sig = await alice.signMessage(hmsg);
-      console.log("sig=", sig);
-      sig = sig.substr(0, 130) + (sig.substr(130) == "00" ? "1b" : "1c"); // v: 0,1 => 27,28
-      console.log("sig=", sig);
-
-      const rc = await nft3.connect(alice).verify(hmsg, sig);
-      console.log("rc=", rc);
-      expect(rc).to.equal(alice.address);
-
-
-      var message = "0x1234";
-      console.log("message: ", message);
-      var msgHash    = await nft3.messageHash(message);
-      var ethHash = await nft3.ethSignedHash(msgHash);
-  
-      let signature = await alice.signMessage(message);
-      //signature = signature.substr(0, 130) + (signature.substr(130) == "00" ? "1b" : "1c"); // v: 0,1 => 27,28
-      var recovered = await nft3.recover(ethHash, signature); // recover from the ethHash
-      console.log(recovered, alice.address);
-      console.log(ethHash, signature);
-
-      const message = ethers.utils.toUtf8Bytes("hello world");
-      const messageHash = ethers.utils.keccak256(message);
-      console.log("messageHash", messageHash);
-
-      let signature = await alice.signMessage(messageHash);
-      console.log("signature", signature);
-
-      let address = await ethers.utils.verifyMessage(messageHash, signature);
-      console.log("address", address);
-      expect(address).to.be.equal(alice.address);
-
-      const signature2 = signature.substr(0, 130) + (signature.substr(130) == "00" ? "1b" : "1c"); // v: 0,1 => 27,28
-      var recovered = await nft3.recover(messageHash, signature2);
-      console.log("recovered", recovered);
-
-      var recovered2 = await nft3.test();
-
-*/      
       const nonce = await nft3.nonce()
       console.log("nonce:", nonce);
       const msg1 = ethers.utils.keccak256(
-        ethers.utils.defaultAbiCoder.encode(['uint256', 'address', 'uint256',  'string'], [nonce, alice.address, 1234, "hello world"])
+        //ethers.utils.defaultAbiCoder.encode(['uint256', 'address', 'uint256',  'string'], [nonce, alice.address, 1234, "hello world"])
+        ethers.utils.defaultAbiCoder.encode(['address', 'uint256',  'string'], [alice.address, 1234, "hello world"])
       );
       const msg2 = ethers.utils.arrayify(msg1);
-
-      console.log("msg1=", msg1);
-      console.log("msg2=", msg2);
 
       const signature = await alice.signMessage(msg2);
 
       await time.increase(2000);
       
-      var recovered2 = await nft3.connect(alice).test(signature);
-      expect(recovered2).to.be.equal(alice.address);
+      const address = await nft3.connect(alice).verifySignature(signature);
+      expect(address).to.be.equal(alice.address);
+
+      //verify from js side
+      const address2 = await ethers.utils.verifyMessage(msg2, signature);
+      expect(address2).to.be.equal(alice.address);
+
     });
   });
 });
