@@ -8,12 +8,36 @@ const { expect } = require("chai");
 const TWEI = 1_000_000_000_000;
 const RATE = 100*TWEI;
 
+const sleep = async (n)=>{
+  return new Promise((resolve)=>{
+    let i = 1;
+    setInterval(()=>{
+      process.stdout.write(`i = ${i}\r`);
+      i++;
+      if (i === n) resolve();
+    }, 1000);
+  });
+}
+
 describe("Nft4", function () {
   async function deployFixture() {
     const [owner, alice, bob] = await ethers.getSigners();
 
     const Nft4 = await ethers.getContractFactory("NFT4");
     const nft4 = await Nft4.deploy(RATE, "https://localhost:3000/");
+
+    //default is 4  seconds, not necessary the more frequent the better
+    //nft4.provider.pollingInterval = 1;
+
+    //this seems to be a bug in hardhat tes, it is not ALWAYS fire
+    //seems if you kill and start a new terminal, and run npx hardhat clean, you have more chance to fire this event
+    //maybe it will work better in app. so in test, use tx.wait, and get the event from there
+
+    //another thought, if the event generated too quickly, some seems missing
+    nft4.on("Transfer", (_from,_to,_value) => {
+      console.log("transfer event", _from, _to, _value);
+    });
+
     return { nft4, owner, alice, bob };
   }
 
@@ -110,27 +134,30 @@ describe("Nft4", function () {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).to.be.revertedWith("You aren't the owner and record is not expired yet");
 
+      const tokensA1 = await nft4.tokens(alice.address);
+      console.log("Alice token = ", tokensA1);
+      expect(tokensA1.map(x=>x.toNumber())).to.be.eql([0, 2, 3]);
+
+      const tokensB1 = await nft4.tokens(bob.address);
+      expect(tokensB1.map(x=>x.toNumber())).to.be.eql([4, 5, 6, 1]);
+
       const token3 = await nft4.token('alice-1');
       //transfer the nft to alice
-
-      for (let i=1; i<=lastTokenId; i++){
-        try{
-          const owner = await nft4.ownerOf(i);
-          const host = (await nft4.data(i)).host;
-          console.log(i, owner, host);
-        }
-        catch(e){
-          console.log(i, e.reason);
-        }
-      }
-
-      nft4.on("Transfer", (_from,_to,_value) => {
-        console.log("xxxxxxxxxxxxxxxxx", _from,_to,_value);
-      });
 
       const tx = await nft4.connect(bob).transferFrom(bob.address, alice.address, token3);
       await expect(tx).to.emit(nft4, "Transfer").withArgs(bob.address, alice.address, token3);
 
+      const rc = await tx.wait();
+      
+      for (let e of rc.events){
+        if (e.event === "Transfer"){
+          expect(e.args.from).to.be.equal(bob.address);
+          expect(e.args.to).to.be.equal(alice.address);
+          expect(e.args.tokenId).to.be.equal(token3);
+        }
+        
+      }
+      
       console.log("--------------------");
       for (let i=1; i<=lastTokenId; i++){
         try{
@@ -150,34 +177,30 @@ describe("Nft4", function () {
 
       const nAlice = await nft4.balanceOf(alice.address);
       const nBob = await nft4.balanceOf(bob.address);
+      expect(nAlice).to.be.equal(3);
+      expect(nBob).to.be.equal(3);
 
-      console.log(nAlice, nBob);
+      const tokensA2 = await nft4.tokens(alice.address);
+      expect(tokensA2.map(x=>x.toNumber())).to.be.eql([0, 2, 3, 1]);
 
-      const tokensA = await nft4.tokens(alice.address);
-      console.log("Alice token = ", tokensA);
+      //each token owner should be the owner
+      for (let tid of tokensA2){
+        if (tid>0){
+          expect(await nft4.ownerOf(tid)).to.be.equal(alice.address);
+        }
+      }
 
-      const tokensB = await nft4.tokens(bob.address);
-      console.log("Bob token = ", tokensB);
+      const tokensB2 = await nft4.tokens(bob.address);
+      expect(tokensB2.map(x=>x.toNumber())).to.be.eql([4, 5, 6, 0]);
+      //each token owner should be the owner
+      for (let tid of tokensB2){
+        if (tid>0){
+          expect(await nft4.ownerOf(tid)).to.be.equal(bob.address);
+        }
+      }
 
-      await new Promise((resolve)=>{
-        setTimeout(()=>{
-          console.log("aaaaaa");
-          resolve();
-        }, 15000);
-      });
+      await sleep(5);
     });
 
-
-
-    /*
-    it("Should work", async function () {
-
-
-
-
-
-
-    });
-*/
   });
 });

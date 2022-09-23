@@ -78,15 +78,8 @@ contract NFT4 is ERC721, Ownable {
             if (block.timestamp/60/60/24 > curData.expiredAt){
                 //expired 
                 if (ownerOf(curTokenId) != msg.sender){
-                    console.log("ownerOf(curTokenId) = ", ownerOf(curTokenId));
+                    //console.log("ownerOf(curTokenId) = ", ownerOf(curTokenId));
                     //this internal function can transfer the owner even the caller is not the owner
-                    
-                    _owners[msg.sender].push(curTokenId);
-
-                    uint256[] storage _tokens = _owners[ownerOf(curTokenId)];
-                    for (uint i = 0; i < _tokens.length; i++){
-                        if (_tokens[i] == curTokenId) _tokens[i] = 0;
-                    }
                     _transfer(ownerOf(curTokenId), msg.sender, curTokenId);
                 }
                 uint16 expiredAt = uint16(block.timestamp/60/60/24 + numOfDays);
@@ -115,6 +108,19 @@ contract NFT4 is ERC721, Ownable {
             _owners[msg.sender].push(tokenId);
             return tokenId;
         }
+    }
+
+    function _transfer(address from, address to, uint256 tokenId) internal override {
+        //console.log("override _transfer");
+ 
+        _owners[to].push(tokenId);
+
+        uint256[] storage _tokens = _owners[from];
+        for (uint i = 0; i < _tokens.length; i++){
+            if (_tokens[i] == tokenId) _tokens[i] = 0;
+        }
+
+        super._transfer(from, to, tokenId);
     }
 
 }
