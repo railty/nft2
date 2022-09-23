@@ -8,102 +8,134 @@ const { expect } = require("chai");
 const TWEI = 1_000_000_000_000;
 const RATE = 100*TWEI;
 
-describe("Nft3", function () {
+describe("Nft4", function () {
   async function deployFixture() {
     const [owner, alice, bob] = await ethers.getSigners();
 
-    const Nft3 = await ethers.getContractFactory("Nft3");
-    //const nft2 = await Nft2.deploy(RATE, "https://localhost:3000/{id}.json");
-    const nft3 = await Nft3.deploy(RATE);
-    return { nft3, owner, alice, bob };
+    const Nft4 = await ethers.getContractFactory("NFT4");
+    const nft4 = await Nft4.deploy(RATE, "https://localhost:3000/");
+    return { nft4, owner, alice, bob };
   }
 
   describe("Deployment", function () {
-    it("Should work", async function () {
-      const { nft3, owner, alice, bob} = await loadFixture(deployFixture);
-      const days = 100;
+    it("basic work", async function () {
+      const { nft4, owner, alice, bob} = await loadFixture(deployFixture);
 
-      //cannot register 1 letter
-      await expect(nft3.connect(bob).mintNFT('a', days, {
-        value: ethers.BigNumber.from(RATE).mul(days)
-      })).to.be.revertedWith("host length must be greater than 1");
-
-      //alice can register
-      await expect(nft3.connect(alice).mintNFT('alice-host', days, {
+      const days = 123;
+      await expect(await nft4.connect(alice).register("alice-1", days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
-      expect((await nft3.ownerOf(1))).to.equal(alice.address);
-      await expect(nft3.ownerOf(2)).to.be.revertedWith("ERC721: invalid token ID");
+      expect(await nft4.ownerOf(await nft4.token("alice-1"))).to.be.equal(alice.address);
+
+      await expect(await nft4.connect(alice).register("alice-2", days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+      await expect(await nft4.connect(alice).register("alice-3", days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+
+      await expect(await nft4.connect(bob).register("bob-1", days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+      expect(await nft4.ownerOf(await nft4.token("bob-1"))).to.be.equal(bob.address);
+
+      await expect(await nft4.connect(bob).register("bob-2", days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+      await expect(await nft4.connect(bob).register("bob-3", days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).not.to.be.reverted;
+
+      const lastTokenId = await nft4.lastTokenId();
+      console.log("lastTokenId = ", lastTokenId);
+
+      for (let i=1; i<=lastTokenId; i++){
+        const data = await nft4.data(i);
+        expect(data.expiredAt).to.be.equal(Math.floor(Date.now()/1000/60/60/24+days));
+      }
 
       //bob cannot register same host
-      await expect(nft3.connect(bob).mintNFT('alice-host', days, {
+      await expect(nft4.connect(bob).register('alice-1', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).to.be.revertedWith("You aren't the owner and record is not expired yet");
 
-      //bob can register diffrent host
-      await expect(nft3.connect(bob).mintNFT('bob-host', days, {
-        value: ethers.BigNumber.from(RATE).mul(days)
-      })).not.to.be.reverted;
-
-      //100-10 = 90 days later
+      //days-10 days later, 10 days left to expire
       const unlockTime1 = (await time.latest()) + (days-10)*60*60*24;
       await time.increaseTo(unlockTime1);
 
       //bob still cannot register
-      await expect(nft3.connect(bob).mintNFT('alice-host', days, {
+      await expect(nft4.connect(bob).register('alice-1', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).to.be.revertedWith("You aren't the owner and record is not expired yet");
 
       //alice can register/renew
-      const tm1 = (await nft3.hosts('alice-host')).expiredAt;
-      await expect(nft3.connect(alice).mintNFT('alice-host', days, {
+      const token1 = await nft4.token('alice-1');
+
+      const tm1 = (await nft4.data(token1)).expiredAt;
+
+      await expect(nft4.connect(alice).register('alice-1', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
-      const tm2 = (await nft3.hosts('alice-host')).expiredAt;
-      expect((tm2-tm1)/60/60/24).to.equal(days);
+      const token2 = await nft4.token('alice-1');
+      //same token
+      expect(token1).to.be.equal(token2);
+      const tm2 = (await nft4.data(token1)).expiredAt;
+      expect(tm2-tm1).to.equal(days);
 
-      //100-10+20 = 110 days later
+      //another days+20 days later, or 20 days after expired
       const unlockTime2 = (await time.latest()) + (days+20)*60*60*24;
       await time.increaseTo(unlockTime2);
 
       //bob can now register as it is expired
-      const rec1 = await nft3.hosts('alice-host');
-      await expect(nft3.connect(bob).mintNFT('alice-host', days, {
+      const token11 = await nft4.token('alice-1');
+      const tm11 = (await nft4.data(token11)).expiredAt;
+      
+      await expect(nft4.connect(bob).register('alice-1', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
-      const rec2 = await nft3.hosts('alice-host');
-      expect(rec1.tokenId).not.to.equal(rec2.tokenId);
 
-      const tm = rec2.expiredAt - rec1.expiredAt;
-      expect(Math.floor(tm/60/60/24)).to.equal(days+10);
+      const token12 = await nft4.token('alice-1');
+      //same token
+      expect(token11).to.be.equal(token12);
 
-      const lastId = await nft3.lastId();
-      console.log(lastId);
-      for (let i=0; i<=lastId; i++){
+      const tm12 = (await nft4.data(token11)).expiredAt;
+      expect(tm12-tm11).to.equal(days+10);
+
+      //another days-10 later
+      const unlockTime3 = (await time.latest()) + (days-10)*60*60*24;
+      await time.increaseTo(unlockTime3);
+
+      //alice cannot renew it as it belongs to bob now
+      await expect(nft4.connect(alice).register('alice-1', days, {
+        value: ethers.BigNumber.from(RATE).mul(days)
+      })).to.be.revertedWith("You aren't the owner and record is not expired yet");
+
+      const token3 = await nft4.token('alice-1');
+      //transfer the nft to alice
+
+      for (let i=1; i<=lastTokenId; i++){
         try{
-          const owner = await nft3.ownerOf(i);
-          const host = await nft3.ids(i);
+          const owner = await nft4.ownerOf(i);
+          const host = (await nft4.data(i)).host;
           console.log(i, owner, host);
         }
         catch(e){
           console.log(i, e.reason);
         }
       }
-      console.log("-------------------");
 
+      nft4.on("Transfer", (_from,_to,_value) => {
+        console.log("xxxxxxxxxxxxxxxxx", _from,_to,_value);
+      });
 
-      //alice cannot renew it as it belongs to bob now
-      await expect(nft3.connect(alice).mintNFT('alice-host', days, {
-        value: ethers.BigNumber.from(RATE).mul(days)
-      })).to.be.revertedWith("You aren't the owner and record is not expired yet");
+      const tx = await nft4.connect(bob).transferFrom(bob.address, alice.address, token3);
+      await expect(tx).to.emit(nft4, "Transfer").withArgs(bob.address, alice.address, token3);
 
-      //transfer the nft to alice
-      await nft3.connect(bob).transferFrom(bob.address, alice.address, 4);
-
-      for (let i=0; i<=lastId; i++){
+      console.log("--------------------");
+      for (let i=1; i<=lastTokenId; i++){
         try{
-          const owner = await nft3.ownerOf(i);
-          const host = await nft3.ids(i);
+          const owner = await nft4.ownerOf(i);
+          const host = (await nft4.data(i)).host;
           console.log(i, owner, host);
         }
         catch(e){
@@ -112,48 +144,40 @@ describe("Nft3", function () {
       }
 
       //alice can renew it again
-      await expect(nft3.connect(alice).mintNFT('alice-host', days, {
+      await expect(nft4.connect(alice).register('alice-1', days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
 
-      const nAlice = await nft3.balanceOf(alice.address);
-      const nBob = await nft3.balanceOf(bob.address);
+      const nAlice = await nft4.balanceOf(alice.address);
+      const nBob = await nft4.balanceOf(bob.address);
 
       console.log(nAlice, nBob);
 
-      for (let i=0; i<nAlice; i++){
-        const tokenId = await nft3.tokenOfOwnerByIndex(alice.address, i);
-        console.log("Alice token = ", tokenId);
-      }
+      const tokensA = await nft4.tokens(alice.address);
+      console.log("Alice token = ", tokensA);
 
-      for (let i=0; i<nBob; i++){
-        const tokenId = await nft3.tokenOfOwnerByIndex(bob.address, i);
-        console.log("Bob token = ", tokenId);
-      }
+      const tokensB = await nft4.tokens(bob.address);
+      console.log("Bob token = ", tokensB);
+
+      await new Promise((resolve)=>{
+        setTimeout(()=>{
+          console.log("aaaaaa");
+          resolve();
+        }, 15000);
+      });
     });
 
-    it("sign message should work", async function () {
-      const { nft3, owner, alice, bob} = await loadFixture(deployFixture);
 
-      const nonce = await nft3.nonce()
-      console.log("nonce:", nonce);
-      const msg1 = ethers.utils.keccak256(
-        //ethers.utils.defaultAbiCoder.encode(['uint256', 'address', 'uint256',  'string'], [nonce, alice.address, 1234, "hello world"])
-        ethers.utils.defaultAbiCoder.encode(['address', 'uint256',  'string'], [alice.address, 1234, "hello world"])
-      );
-      const msg2 = ethers.utils.arrayify(msg1);
 
-      const signature = await alice.signMessage(msg2);
+    /*
+    it("Should work", async function () {
 
-      await time.increase(2000);
-      
-      const address = await nft3.connect(alice).verifySignature(signature);
-      expect(address).to.be.equal(alice.address);
 
-      //verify from js side
-      const address2 = await ethers.utils.verifyMessage(msg2, signature);
-      expect(address2).to.be.equal(alice.address);
+
+
+
 
     });
+*/
   });
 });
