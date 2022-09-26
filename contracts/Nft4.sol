@@ -25,6 +25,9 @@ contract NFT4 is ERC721, Ownable {
     mapping(address => uint256[]) private _owners;
 
     string baseUri;
+
+    event Shout(uint256 indexed _id );
+
     constructor(uint _rate, string memory _baseUri) ERC721("NFT4", "NFT4") {
         rate = _rate;
         baseUri = _baseUri;
@@ -72,6 +75,8 @@ contract NFT4 is ERC721, Ownable {
         //console.log(msg.value, numOfDays*rate);
         require(msg.value >= numOfDays*rate, "insufficient funds");
 
+        emit Shout(_tokenIdCounter.current());
+        
         uint256 curTokenId = _ids[host];
         if (_exists(curTokenId)){    //exist record
             Data storage curData = _datas[curTokenId];

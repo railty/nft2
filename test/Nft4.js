@@ -1,7 +1,7 @@
-const {
-  time,
-  loadFixture,
-} = require("@nomicfoundation/hardhat-network-helpers");
+const fs = require("fs")
+const path = require("path")
+
+const {time, loadFixture,} = require("@nomicfoundation/hardhat-network-helpers");
 const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const { expect } = require("chai");
 
@@ -17,6 +17,23 @@ const sleep = async (n)=>{
       if (i === n) resolve();
     }, 1000);
   });
+}
+
+const getAbi = (contract) => {
+  try {
+    const dir = path.resolve(
+      __dirname,
+      `../artifacts/contracts/${contract}.sol/${contract.toUpperCase()}.json`
+    )
+    const file = fs.readFileSync(dir, "utf8")
+    const json = JSON.parse(file)
+    const abi = json.abi
+    //console.log(`abi`, abi)
+
+    return abi
+  } catch (e) {
+    console.log(`e`, e)
+  }
 }
 
 describe("Nft4", function () {
@@ -69,6 +86,7 @@ describe("Nft4", function () {
       await expect(await nft4.connect(bob).register("bob-3", days, {
         value: ethers.BigNumber.from(RATE).mul(days)
       })).not.to.be.reverted;
+
 
       const lastTokenId = await nft4.lastTokenId();
       console.log("lastTokenId = ", lastTokenId);
@@ -199,8 +217,25 @@ describe("Nft4", function () {
         }
       }
 
-      await sleep(5);
-    });
+      const abi = getAbi('Nft4');
+      let iface = new ethers.utils.Interface(abi);
 
+      const logs = await ethers.provider.getLogs({
+        fromBlock: nft4.deployTransaction.blockNumber,
+        toBlock: 'latest',
+        address: nft4.address,
+        topics: ['0x08431c6523e6d1830d63b72b244e6e67485126c1c95af21aef52024a92db5034']
+      });
+
+      for (let i=0; i<logs.length; i++){
+        const e = iface.parseLog(logs[i]);
+        console.log("e = ", e.name, e.args, e);
+      }
+
+      console.log("e = ", logs.length);
+
+//      await sleep(10);
+    });
   });
+
 });
